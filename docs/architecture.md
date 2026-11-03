@@ -95,3 +95,4 @@ flowchart TB
 
     C -->|HTTP requests| W
     W -->|Events| C
+```
