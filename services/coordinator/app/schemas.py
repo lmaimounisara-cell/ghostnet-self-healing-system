@@ -7,3 +7,4 @@ class JobCreate(BaseModel):
 
 class JobRead(JobCreate):
     id: int
+    status: str

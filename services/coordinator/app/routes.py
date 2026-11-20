@@ -1,52 +1,89 @@
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.schemas import JobCreate, JobRead
-
+from app.models import Job
+from app.db import get_session
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 _db: dict[int, JobRead] = {}
 
 @router.get("", response_model=list[JobRead])
-async def list_jobs():
-    return list(_db.values())
+async def list_jobs(session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(Job))
+    return result.scalars().all()
 
 @router.get("/{job_id}", response_model=JobRead)
-async def get_job(job_id: int):
-    if job_id not in _db:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return _db[job_id]
+async def get_job(
+    job_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    job = await session.get(Job, job_id)
 
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found"
+        )
+
+    return job
 
 _next_id = 1
 
 @router.post("", response_model=JobRead, status_code=201)
-async def create_job(job: JobCreate):
-    global _next_id
+async def create_job(
+    job: JobCreate,
+    session: AsyncSession = Depends(get_session)
+):
+    new_job = Job(
+        name=job.name,
+        priority=job.priority
+    )
 
-    new_job = JobRead(id=_next_id, **job.model_dump())
-
-    _db[_next_id] = new_job
-    _next_id += 1
+    session.add(new_job)
+    await session.commit()
+    await session.refresh(new_job)
 
     return new_job
 
 
 @router.put("/{job_id}", response_model=JobRead)
-async def update_job(job_id: int, job: JobCreate):
-    if job_id not in _db:
-        raise HTTPException(status_code=404, detail="Job not found")
+async def update_job(
+    job_id: int,
+    job: JobCreate,
+    session: AsyncSession = Depends(get_session)
+):
+    existing_job = await session.get(Job, job_id)
 
-    updated_job = JobRead(id=job_id, **job.model_dump())
-    _db[job_id] = updated_job
+    if existing_job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found"
+        )
 
-    return updated_job
+    existing_job.name = job.name
+    existing_job.priority = job.priority
+
+    await session.commit()
+    await session.refresh(existing_job)
+
+    return existing_job
 
 
 @router.delete("/{job_id}", status_code=204)
-async def delete_job(job_id: int):
-    if job_id not in _db:
-        raise HTTPException(status_code=404, detail="Job not found")
+async def delete_job(
+    job_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    job = await session.get(Job, job_id)
 
-    del _db[job_id]
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found"
+        )
+
+    await session.delete(job)
+    await session.commit()
 
 
