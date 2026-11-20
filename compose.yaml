@@ -1,0 +1,5 @@
+services:
+  coordinator:
+    build: ./services/coordinator
+    ports:
+      - "127.0.0.1:8000:8000"
