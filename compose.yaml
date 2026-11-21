@@ -4,20 +4,57 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://ghostnet:ghostnet_dev@db-coordinator:5432/ghostnet
-
-
-
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-coordinator:5432/${COORDINATOR_DB}"
+    depends_on:
+      db-coordinator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).close()"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   db-coordinator:
     image: postgres:16
     environment:
-      POSTGRES_USER: ghostnet
-      POSTGRES_PASSWORD: ghostnet_dev
-      POSTGRES_DB: ghostnet
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${COORDINATOR_DB}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${COORDINATOR_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  workers:
+    build: ./services/workers
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      db-workers:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).close()"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  db-workers:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${WORKERS_DB}"
+    volumes:
+      - workers_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${WORKERS_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   postgres_data:
-
+  workers_data:
