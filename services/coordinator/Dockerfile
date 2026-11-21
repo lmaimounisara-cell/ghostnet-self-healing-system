@@ -2,7 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir fastapi uvicorn "sqlalchemy[asyncio]" asyncpg alembic httpx tenacity pybreaker
+RUN pip install --no-cache-dir fastapi uvicorn "sqlalchemy[asyncio]" asyncpg alembic httpx tenacity pybreaker aio-pika
+
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini

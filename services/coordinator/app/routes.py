@@ -1,14 +1,19 @@
+import logging
+
 import httpx
+from aio_pika.exceptions import AMQPException
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import Job
+from app.publisher import publish_job_created
 from app.schemas import JobCreate, JobRead
 from app.worker_client import get_worker_capacity
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[JobRead])
@@ -50,10 +55,16 @@ async def create_job(
         )
 
     new_job = Job(name=job.name, priority=job.priority)
-
     session.add(new_job)
     await session.commit()
     await session.refresh(new_job)
+
+    try:
+        await publish_job_created(new_job.id)
+    except (AMQPException, OSError) as exc:
+        logger.warning(
+            "Could not publish job.created for job %s: %s", new_job.id, exc
+        )
 
     return new_job
 

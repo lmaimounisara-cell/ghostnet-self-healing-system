@@ -5,6 +5,7 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-coordinator:5432/${COORDINATOR_DB}"
+      AMQP_URL: "amqp://ghostnet:ghostnet_demo@rabbitmq:5672/"
     depends_on:
       db-coordinator:
         condition: service_healthy
@@ -54,6 +55,21 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "127.0.0.1:15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ghostnet
+      RABBITMQ_DEFAULT_PASS: ghostnet_demo
+
+  notifications:
+    build: ./services/notifications
+    environment:
+      AMQP_URL: "amqp://ghostnet:ghostnet_demo@rabbitmq:5672/"
+    depends_on:
+      - rabbitmq
 
 volumes:
   postgres_data:
