@@ -54,13 +54,13 @@ async def create_job(
             detail="No worker capacity available",
         )
 
-    new_job = Job(name=job.name, priority=job.priority)
+    new_job = Job(name=job.name, priority=job.priority, email=job.email)
     session.add(new_job)
     await session.commit()
     await session.refresh(new_job)
 
     try:
-        await publish_job_created(new_job.id)
+        await publish_job_created(new_job.id, new_job.email)
     except (AMQPException, OSError) as exc:
         logger.warning(
             "Could not publish job.created for job %s: %s", new_job.id, exc
@@ -82,6 +82,7 @@ async def update_job(
 
     existing_job.name = job.name
     existing_job.priority = job.priority
+    existing_job.email = job.email
 
     await session.commit()
     await session.refresh(existing_job)
